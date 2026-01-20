@@ -10,9 +10,13 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
 
-from src.pipeline.prediction_pipeline import PredictionPipeline
-from src.pipeline.train_pipeline import TrainPipeline
-from src.constant.application import *
+# from src.pipeline.prediction_pipeline import PredictionPipeline # Removed to avoid AWS dependency
+# from src.pipeline.train_pipeline import TrainPipeline # Removed to avoid AWS dependency
+# from src.constant.application import * # Removed to avoid src dependency
+from app_local import predict_cluster, create_advanced_model, DataForm # Import local logic
+
+APP_HOST = "0.0.0.0"
+APP_PORT = 5000
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -90,11 +94,12 @@ class DataForm:
 @app.get("/train")
 async def trainRouteClient():
     try:
-        train_pipeline = TrainPipeline()
+        # train_pipeline = TrainPipeline()
+        # train_pipeline.run_pipeline()
+        
+        create_advanced_model() # Use local training logic instead
 
-        train_pipeline.run_pipeline()
-
-        return Response("Training successful !!")
+        return Response("Training successful (Local Advanced Model) !!")
 
     except Exception as e:
         return Response(f"Error Occurred! {e}")
@@ -141,20 +146,31 @@ async def predictRouteClient(request: Request):
                     form.Total_Promo, 
                     form.NumWebVisitsMonth]
         
-        prediction_pipeline = PredictionPipeline()
-        predicted_cluster = prediction_pipeline.run_pipeline(input_data=input_data)
-       
+        # prediction_pipeline = PredictionPipeline()
+        # predicted_cluster = prediction_pipeline.run_pipeline(input_data=input_data)
         
-        # model_predictor = Customer_segmentation_Classifier()
-
-        # predicted_cluster = model_predictor.predict(customer_data_df)
+        # Use local prediction logic
+        predicted_cluster, confidence = predict_cluster(input_data)
+        
         return templates.TemplateResponse(
             "customer.html",
-            {"request": request, "context": int(predicted_cluster[0])}
+            {
+                "request": request, 
+                "context": int(predicted_cluster[0]),
+                "confidence": f"{confidence * 100:.1f}"
+            }
         )
 
     except Exception as e:
-        return {"status": False, "error": f"{e}"}
+         print(f"❌ Error during prediction: {e}")
+         return templates.TemplateResponse(
+            "customer.html",
+            {
+                "request": request, 
+                "context": "Rendering",
+                "error": str(e)
+            }
+        )
 
 
 if __name__ == "__main__":

@@ -514,7 +514,15 @@ async def predictRouteClient(request: Request):
         )
 
     except Exception as e:
-        return {"status": False, "error": f"{e}"}
+        print(f"❌ Error during prediction: {e}")  # Log for debugging
+        return templates.TemplateResponse(
+            "customer.html",
+            {
+                "request": request, 
+                "context": "Rendering",
+                "error": str(e)
+            }
+        )
 
 
 @app.get("/status", response_class=HTMLResponse)

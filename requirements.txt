@@ -1,30 +1,12 @@
-boto3
-botocore
-dill
-dnspython
-# Locked to prevent upgrade to 0.7+ which breaks imports, and dev0 strictly for legacy support
-evidently==0.1.58.dev0
 fastapi
-from-root
-httptools
-# imblearn was renamed to imbalanced-learn in newer pypi, but imblearn might still work as alias or we use imbalanced-learn
-imbalanced-learn
-mypy-boto3-s3
-pip-chill
-pymongo
-jinja2
-python-dotenv
-types-s3transfer
 uvicorn
-watchfiles
-websockets
-wincertstore
-xgboost
-python-multipart
-neuro_mf
-# Explicit locks for environment consistency
-numpy<2
-PyYAML>=6.0
 pandas
+numpy<2
 scikit-learn
 scipy
+jinja2
+python-dotenv
+python-multipart
+# Optional utilities
+watchfiles
+httptools
