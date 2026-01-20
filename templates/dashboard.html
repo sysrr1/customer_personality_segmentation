@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Analytics Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 0;
+        }
+
+        .dashboard-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+        }
+
+        .metric-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="text-center mb-4">
+            <h1 class="display-4 fw-bold text-white">
+                <i class="fas fa-chart-line"></i> Analytics Dashboard
+            </h1>
+            <p class="text-white">Real-time Model Performance & Insights</p>
+        </div>
+
+        <!-- Metrics Row -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="metric-box">
+                    <div class="metric-value" id="totalClusters">-</div>
+                    <div class="metric-label">Total Clusters</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-box">
+                    <div class="metric-value" id="silhouetteScore">-</div>
+                    <div class="metric-label">Silhouette Score</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-box">
+                    <div class="metric-value" id="trainingSamples">-</div>
+                    <div class="metric-label">Training Samples</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-box">
+                    <div class="metric-value" id="featuresUsed">-</div>
+                    <div class="metric-label">Features Used</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="dashboard-card">
+                    <h4><i class="fas fa-pie-chart"></i> Cluster Distribution</h4>
+                    <div class="chart-container">
+                        <canvas id="clusterChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="dashboard-card">
+                    <h4><i class="fas fa-chart-bar"></i> Model Performance</h4>
+                    <div class="chart-container">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cluster Details -->
+        <div class="dashboard-card">
+            <h4><i class="fas fa-users"></i> Cluster Characteristics</h4>
+            <div id="clusterDetails" class="row mt-3">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="text-center mt-4">
+            <a href="/" class="btn btn-light btn-lg me-2">
+                <i class="fas fa-home"></i> Back to App
+            </a>
+            <a href="/status" class="btn btn-outline-light btn-lg">
+                <i class="fas fa-heartbeat"></i> System Status
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Fetch metrics and populate dashboard
+        async function loadDashboard() {
+            try {
+                // Fetch metrics
+                const response = await fetch('/api/metrics');
+                const data = await response.json();
+
+                // Update metric boxes
+                document.getElementById('totalClusters').textContent = data.optimal_clusters || '-';
+                document.getElementById('silhouetteScore').textContent =
+                    data.silhouette_score ? data.silhouette_score.toFixed(3) : '-';
+                document.getElementById('trainingSamples').textContent = data.training_samples || '-';
+                document.getElementById('featuresUsed').textContent = data.features_used || '-';
+
+                // Create cluster distribution chart
+                if (data.cluster_sizes) {
+                    const clusterLabels = Object.keys(data.cluster_sizes).map(k => `Cluster ${k}`);
+                    const clusterData = Object.values(data.cluster_sizes);
+
+                    new Chart(document.getElementById('clusterChart'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: clusterLabels,
+                            datasets: [{
+                                data: clusterData,
+                                backgroundColor: [
+                                    '#667eea',
+                                    '#764ba2',
+                                    '#f093fb',
+                                    '#4facfe'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Create performance chart
+                new Chart(document.getElementById('performanceChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Silhouette', 'Davies-Bouldin', 'Calinski-H'],
+                        datasets: [{
+                            label: 'Score',
+                            data: [
+                                data.silhouette_score || 0,
+                                data.davies_bouldin_score || 0,
+                                (data.calinski_harabasz_score || 0) / 1000 // Scale down
+                            ],
+                            backgroundColor: [
+                                '#10b981',
+                                '#ef4444',
+                                '#3b82f6'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+
+                // Load cluster details
+                await loadClusterDetails(data.optimal_clusters);
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        async function loadClusterDetails(numClusters) {
+            const container = document.getElementById('clusterDetails');
+
+            for (let i = 0; i < numClusters; i++) {
+                try {
+                    const response = await fetch(`/cluster-info/${i}`);
+                    const cluster = await response.json();
+
+                    const card = document.createElement('div');
+                    card.className = 'col-md-6 mb-3';
+                    card.innerHTML = `
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Cluster ${i}: ${cluster.name}</h5>
+                                <p class="card-text">${cluster.description}</p>
+                                <p><strong>Marketing Strategy:</strong> ${cluster.marketing_strategy}</p>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                } catch (error) {
+                    console.error(`Error loading cluster ${i}:`, error);
+                }
+            }
+        }
+
+        // Load dashboard on page load
+        loadDashboard();
+    </script>
+</body>
+
+</html>
