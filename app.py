@@ -13,7 +13,8 @@ from fastapi.staticfiles import StaticFiles
 # from src.pipeline.prediction_pipeline import PredictionPipeline # Removed to avoid AWS dependency
 # from src.pipeline.train_pipeline import TrainPipeline # Removed to avoid AWS dependency
 # from src.constant.application import * # Removed to avoid src dependency
-from app_local import predict_cluster, create_advanced_model, DataForm # Import local logic
+from app_local import predict_cluster, create_advanced_model, DataForm, load_or_create_model, METRICS_PATH # Import local logic
+import json
 
 APP_HOST = "0.0.0.0"
 APP_PORT = 5000
@@ -171,6 +172,99 @@ async def predictRouteClient(request: Request):
                 "error": str(e)
             }
         )
+
+
+@app.get("/dashboard")
+async def dashboard(request: Request):
+    """Analytics dashboard with visualizations"""
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+
+@app.get("/api/metrics")
+async def get_metrics():
+    """API endpoint to get model metrics as JSON"""
+    if METRICS_PATH.exists():
+        try:
+            with open(METRICS_PATH, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+    
+    return {
+        "optimal_clusters": 0,
+        "silhouette_score": 0,
+        "davies_bouldin_score": 0,
+        "calinski_harabasz_score": 0,
+        "cluster_sizes": {},
+        "training_samples": 0,
+        "features_used": 0
+    }
+
+
+@app.get("/cluster-info/{cluster_id}")
+async def cluster_info(cluster_id: int):
+    """Get detailed information about a specific cluster"""
+    model_data = load_or_create_model()
+    optimal_k = model_data['optimal_k']
+    
+    if cluster_id >= optimal_k:
+        return {"error": f"Invalid cluster ID. Must be 0-{optimal_k-1}"}
+    
+    # Get cluster statistics
+    stats = model_data.get('cluster_stats', {}).get(cluster_id, {})
+    
+    # Dynamic descriptions based on cluster characteristics
+    descriptions = {
+        0: {
+            "name": "Budget-Conscious Shoppers",
+            "description": "Price-sensitive customers who prefer discounts and promotions",
+            "characteristics": [
+                "High discount usage",
+                "Lower average spending",
+                "Promotion-driven purchases",
+                "Price comparison behavior"
+            ],
+            "marketing_strategy": "Focus on discount campaigns, loyalty programs, and value bundles"
+        },
+        1: {
+            "name": "Premium Customers",
+            "description": "High-value customers with significant spending power",
+            "characteristics": [
+                "High income bracket",
+                "Premium product preference",
+                "Low price sensitivity",
+                "Brand loyal"
+            ],
+            "marketing_strategy": "Exclusive offers, premium products, VIP treatment, personalized service"
+        },
+        2: {
+            "name": "Regular Shoppers",
+            "description": "Moderate spenders with consistent purchase patterns",
+            "characteristics": [
+                "Steady purchase frequency",
+                "Moderate spending",
+                "Balanced channel usage",
+                "Responsive to targeted offers"
+            ],
+            "marketing_strategy": "Regular engagement, seasonal campaigns, cross-selling opportunities"
+        },
+        3: {
+            "name": "Occasional Buyers",
+            "description": "Infrequent shoppers with lower engagement",
+            "characteristics": [
+                "Low purchase frequency",
+                "Minimal engagement",
+                "Sporadic buying patterns",
+                "Needs reactivation"
+            ],
+            "marketing_strategy": "Re-engagement campaigns, special incentives, win-back offers"
+        }
+    }
+    
+    result = descriptions.get(cluster_id, descriptions[0])
+    result['statistics'] = stats
+    
+    return result
 
 
 if __name__ == "__main__":
